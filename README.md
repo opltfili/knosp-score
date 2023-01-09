@@ -10,6 +10,12 @@ In order to run the program, you will first need to create conda environment wit
 Then create the environment with following command (its name will be `knosp`):  
 `conda create --name knosp python==3.10.6 --file requirements.txt`
 
+When the environment is created, activate it:  
+`conda activate knosp`
+
+And then install `nibabel` package:  
+`pip install nibabel`
+
 You need to do this setup only the first time you use this program. After creating the conda environment, you can proceed with the instructions bellow any other time you want to run the program.
 
 ### Running the program 

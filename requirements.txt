@@ -1,5 +1,4 @@
 matplotlib
-nibabel
 numpy
 pathlib
 scikit-image
