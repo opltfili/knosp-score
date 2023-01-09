@@ -1,0 +1,5 @@
+articles/
+data/*
+output/*
+scratch/
+src/__pycache__
