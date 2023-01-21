@@ -17,7 +17,7 @@ def save_layer_img(out_name: str, img_slice: np.ndarray, vessels: np.ndarray,
         plt.axline(line.a[::-1], line.b[::-1], color="white", linewidth=0.5, linestyle=':')
     for line in right_lines:
         plt.axline(line.a[::-1], line.b[::-1], color="white", linewidth=0.5, linestyle=':')
-    plt.title("Layer "+str(layer)+" - score left: "+str(int(score_l))+", score right: "+str(int(score_r)))
+    plt.title("Layer "+str(layer)+" - score left: "+str(score_l)+", score right: "+str(score_r))
     plt.axis("off")
 
     fig = plt.gcf()

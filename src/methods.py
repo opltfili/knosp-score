@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import norm
 from scipy.spatial import ConvexHull
 from skimage.measure import label
 from sklearn.cluster import KMeans
@@ -40,10 +41,11 @@ def classify_vessels(vessels: np.ndarray):
 
 
 def is_pt_out(pts: np.ndarray, line: Line):
-    out = (pts - line.b) @ line.v < 0
-    eps = np.abs((pts - line.b) @ line.v) > 0.5
+    out = (pts - line.b) @ line.v
+    norm_v = 1 / norm(line.v)
+    tolerance = norm_v * np.abs(out)
 
-    return out*eps
+    return (out < 0) * (tolerance > 0.5)
 
 
 def find_lines(LT: Vessel, LB: Vessel):
@@ -74,6 +76,12 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     l_lat, l_mid, l_med = left_lines
     r_lat, r_mid, r_med = right_lines
 
+    LT_com, LB_com = l_mid.a, l_mid.b
+    RB_com, RT_com = r_mid.a, r_mid.b
+
+    LT_to_LB = (LT_com - LB_com) @ (LT_com - LB_com)
+    RT_to_RB = (RT_com - RB_com) @ (RT_com - RB_com)
+
     # Left side
     gr1_l = is_pt_out(carc_pts, l_med)
     gr2_l = is_pt_out(carc_pts, l_mid)
@@ -84,20 +92,28 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     mask_l[carc_pts[gr2_l,0], carc_pts[gr2_l,1]] = 12
     mask_l[carc_pts[gr3_l,0], carc_pts[gr3_l,1]] = 13
 
+    mask_l_1or2 = np.zeros_like(mask_l)
+    mask_l_1or2[mask_l == 11] = 1
+    mask_l_1or2[mask_l == 12] = 1
+    labeled_l, nlab_l = label(mask_l_1or2, return_num=True)
+    for i in range(nlab_l):
+        pts_i = np.argwhere(labeled_l == i+1)
+        com_i = np.mean(pts_i, axis=0)
+        if (com_i - LB_com) @ (LT_com - LB_com) >= LT_to_LB:
+            mask_l_1or2[labeled_l == i+1] = -1
+    mask_l[mask_l_1or2 == -1] = 10
+
     score_l = mask_l.max()-10
 
     if score_l == 3:
-        com_y_inf = l_mid.a[0] if l_mid.a[0] > l_mid.b[0] else l_mid.b[0]
-        com_y_sup = l_mid.a[0] if l_mid.a[0] < l_mid.b[0] else l_mid.b[0]
-        new_l_inf = classify_grade4(mask_l, com_y_inf)
-        if new_l_inf == 4.:
-            score_l = 4.
+        com_l_inf = l_mid.a if l_mid.a[0] > l_mid.b[0] else l_mid.b
+        com_l_sup = l_mid.a if l_mid.a[0] < l_mid.b[0] else l_mid.b
+        new_l_inf, mask_l = classify_grade4(mask_l, com_l_inf, com_l_sup)
+        if new_l_inf == 3.0:
+            mask_l[mask_l == 13] = 10
+            score_l = mask_l.max()-10
         else:
-            new_l_sup = classify_grade4(mask_l, com_y_sup)
-            if new_l_sup == 4.:
-                score_l = 4.
-            else:
-                score_l = new_l_inf
+            score_l = new_l_inf
 
     # Right side
     gr1_r = is_pt_out(carc_pts, r_med)
@@ -109,20 +125,28 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     mask_r[carc_pts[gr2_r,0], carc_pts[gr2_r,1]] = 12
     mask_r[carc_pts[gr3_r,0], carc_pts[gr3_r,1]] = 13
 
+    mask_r_1or2 = np.zeros_like(mask_r)
+    mask_r_1or2[mask_r == 11] = 1
+    mask_r_1or2[mask_r == 12] = 1
+    labeled_r, nlab_r = label(mask_r_1or2, return_num=True)
+    for i in range(nlab_r):
+        pts_i = np.argwhere(labeled_r == i+1)
+        com_i = np.mean(pts_i, axis=0)
+        if (com_i - RB_com) @ (RT_com - RB_com) >= RT_to_RB:
+            mask_r_1or2[labeled_r == i+1] = -1
+    mask_r[mask_r_1or2 == -1] = 10
+
     score_r = mask_r.max()-10
 
     if score_r == 3:
-        com_y_inf = r_mid.a[0] if r_mid.a[0] > r_mid.b[0] else r_mid.b[0]
-        com_y_sup = r_mid.a[0] if r_mid.a[0] < r_mid.b[0] else r_mid.b[0]
-        new_r_inf = classify_grade4(mask_r, com_y_inf)
-        if new_r_inf == 4.:
-            score_r = 4.
+        com_r_inf = r_mid.a if r_mid.a[0] > r_mid.b[0] else r_mid.b
+        com_r_sup = r_mid.a if r_mid.a[0] < r_mid.b[0] else r_mid.b
+        new_r_inf, mask_r = classify_grade4(mask_r, com_r_inf, com_r_sup)
+        if new_r_inf == 3.0:
+            mask_r[mask_r == 13] = 10
+            score_r = mask_r.max()-10
         else:
-            new_r_sup = classify_grade4(mask_r, com_y_sup)
-            if new_r_sup == 4.:
-                score_r = 4.
-            else:
-                score_r = new_r_inf
+            score_r = new_r_inf
 
     # Total
     carc_mask = np.where(mask_l == 10, mask_r, mask_l)
@@ -130,11 +154,13 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     return score_l, score_r, carc_mask
 
 
-def classify_grade4(mask: np.ndarray, com_y: float):
+def classify_grade4(mask: np.ndarray, com_i: np.ndarray, com_s: np.ndarray):
+    dist_coms = (com_i - com_s) @ (com_i - com_s)
     mask3 = (mask==13).astype(int)
     labeled, n = label(mask3, return_num=True)
     sup = False
     inf = False
+    return_4 = False
 
     for i in range(1, n+1):
         sup_i = False
@@ -143,21 +169,26 @@ def classify_grade4(mask: np.ndarray, com_y: float):
         for px in pxs:
             y, x = px
             if 12 in mask[y-1:y+2, x-1:x+2]:
-                if y < com_y:
+                if (px - com_s) @ (com_i - com_s) < dist_coms:
                     sup_i = True
                 else:
                     inf_i = True
         if sup_i and inf_i:
-            return 4.
+            return_4 = True
+        elif not sup_i and not inf_i:
+            mask[labeled==i] = 10
         else:
             sup = sup or sup_i
             inf = inf or inf_i
+
+    if return_4:
+        return 4., mask
     
     if sup and inf:
-        return 3.3
+        return 3.3, mask
     elif sup:
-        return 3.1
+        return 3.1, mask
     elif inf:
-        return 3.2
+        return 3.2, mask
     else:
-        return 3.0
+        return 3.0, mask
