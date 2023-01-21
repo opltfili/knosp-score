@@ -45,10 +45,18 @@ def is_pt_out(pts: np.ndarray, line: Line):
     norm_v = 1 / norm(line.v)
     tolerance = norm_v * np.abs(out)
 
-    return (out < 0) * (tolerance > 0.5)
+    return (out < 0) * (tolerance > 0.5) # half-pixel distance tolerated
 
 
 def find_lines(LT: Vessel, LB: Vessel):
+    """Find connecting lines between vessels.
+    
+    Input (Vessel class) in this order: 
+    - left top, left, bottom
+    OR
+    - right bottom, right top
+    """
+
     mid = Line(LT.com, LB.com)
 
     both = np.vstack((LT.pts, LB.pts))
@@ -92,6 +100,7 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     mask_l[carc_pts[gr2_l,0], carc_pts[gr2_l,1]] = 12
     mask_l[carc_pts[gr3_l,0], carc_pts[gr3_l,1]] = 13
 
+    # decrease classification to 0 for pixels above superior vessel
     mask_l_1or2 = np.zeros_like(mask_l)
     mask_l_1or2[mask_l == 11] = 1
     mask_l_1or2[mask_l == 12] = 1
@@ -105,11 +114,12 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
 
     score_l = mask_l.max()-10
 
+    # differentiate grade 3 subclasses and grade 4
     if score_l == 3:
         com_l_inf = l_mid.a if l_mid.a[0] > l_mid.b[0] else l_mid.b
         com_l_sup = l_mid.a if l_mid.a[0] < l_mid.b[0] else l_mid.b
         new_l_inf, mask_l = classify_grade4(mask_l, com_l_inf, com_l_sup)
-        if new_l_inf == 3.0:
+        if new_l_inf == 3.0: # decrease grade to 0 for pixels above superior vessel
             mask_l[mask_l == 13] = 10
             score_l = mask_l.max()-10
         else:
@@ -125,6 +135,7 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
     mask_r[carc_pts[gr2_r,0], carc_pts[gr2_r,1]] = 12
     mask_r[carc_pts[gr3_r,0], carc_pts[gr3_r,1]] = 13
 
+    # decrease classification to 0 for pixels above superior vessel
     mask_r_1or2 = np.zeros_like(mask_r)
     mask_r_1or2[mask_r == 11] = 1
     mask_r_1or2[mask_r == 12] = 1
@@ -138,11 +149,12 @@ def classify_carcinoma(carcinoma: np.ndarray, left_lines: list, right_lines: lis
 
     score_r = mask_r.max()-10
 
+    # differentiate grade 3 subclasses and grade 4
     if score_r == 3:
         com_r_inf = r_mid.a if r_mid.a[0] > r_mid.b[0] else r_mid.b
         com_r_sup = r_mid.a if r_mid.a[0] < r_mid.b[0] else r_mid.b
         new_r_inf, mask_r = classify_grade4(mask_r, com_r_inf, com_r_sup)
-        if new_r_inf == 3.0:
+        if new_r_inf == 3.0: # decrease grade to 0 for pixels above superior vessel
             mask_r[mask_r == 13] = 10
             score_r = mask_r.max()-10
         else:
@@ -169,11 +181,12 @@ def classify_grade4(mask: np.ndarray, com_i: np.ndarray, com_s: np.ndarray):
         for px in pxs:
             y, x = px
             if 12 in mask[y-1:y+2, x-1:x+2]:
+                # if point is closer to superior than inferior to superior
                 if (px - com_s) @ (com_i - com_s) < dist_coms:
                     sup_i = True
                 else:
                     inf_i = True
-        if sup_i and inf_i:
+        if sup_i and inf_i: # touch bellow and under inferior
             return_4 = True
         elif not sup_i and not inf_i:
             mask[labeled==i] = 10

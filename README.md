@@ -31,6 +31,15 @@ And run the program:
 
 You need to have the inputs in the folder called `data`. The outputs will be saved to `output` folder. 
 
+### Accuracy evaluation
+
+If you want to compute the accuracy of the results, you will first need to install two additional packages:  
+`conda activate knosp`  
+`pip install pandas yaml`
+
+And then run the program `results.py`:  
+`python results.py`
+
 ## Project structure
 
 - *data* - folder with the input data (numbered subfolders for each patient)

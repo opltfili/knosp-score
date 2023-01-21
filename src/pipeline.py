@@ -37,7 +37,7 @@ def process_scan(in_folder: str, out_folder: str) -> None:
     
         LT, LB, RT, RB = classified_vessels
         left_lines = find_lines(LT, LB)
-        right_lines = find_lines(RB, RT)
+        right_lines = find_lines(RB, RT) # B and T reversely, because "out" is meant left to line
 
         score_l, score_r, carc_mask = classify_carcinoma(carcinoma, left_lines, right_lines)
         scores.append([layer, score_l, score_r])
