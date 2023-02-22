@@ -3,3 +3,4 @@ data/*
 output/*
 scratch/
 src/__pycache__
+docs/
